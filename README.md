@@ -20,3 +20,123 @@ Keras是一個開放原始碼，高階的深度學習程式庫，使用Python編
 ![Alt text](readme-images/img1.jpg?raw=true "Title")
 
 透過Keras所提供的各項模組工具，例如卷積和池化模組，我們得以較輕鬆地操作一個類似上圖結構的神經網路，並透過調整各個細節的改變去研究每個環節對訓練與預測會造成那些影響。
+
+## Tensorflow與VGG-16範例 介紹
+
+###### (1)Tensorflow 語法介紹
+以下是我們報告之中所運行的基本程式碼：
+```py
+#第一步先導入Tensorflow、Keras和Matplotlib
+from __future__ import absolute_import, division, print_function, unicode_literals
+import tensorflow as tf
+from tensorflow.keras import datasets, layers, models, initializers
+import matplotlib.pyplot as plt
+import random
+
+#接著把圖片從資料庫中抓下來並分成十個類別
+(train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
+train_images, test_images = train_images / 255.0, test_images / 255.0
+class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+
+#再來是建立運算模型，經過三次卷積與兩次池化，簡化運算效率
+#用relu函數使負值改為0，避免陰影，突現圖像的輪廓
+model = models.Sequential()
+model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(32, 32, 3)))
+model.add(layers.MaxPooling2D((2,2)))
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+
+#透過平坦層(Flatten Layer)將輸出壓成一維圖像
+#回歸至全連階層(Dense Layer)進行分類
+model.add(layers.Flatten())
+model.add(layers.Dense(64, activation='relu'))
+model.add(layers.Dense(10, activation='softmax'))
+model.summary()
+
+#使用adam此一優化器(Optimizer)，編譯和訓練此模型，並建立起圖像結構
+#有50000張圖片用於訓練，10000張圖片用於測試
+model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+history = model.fit(train_images, train_labels, epochs=5, validation_data=(test_images, test_labels))
+print(model.metrics_names)
+
+#最後，繪製出展示訓練準確度和測試準確度的圖表
+plt.plot(history.history['acc'], label='acc')
+plt.plot(history.history['val_acc'], label = 'val_acc')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.ylim([0, 1])
+plt.legend(loc='lower right')
+plt.show()
+test_loss, test_acc = model.evaluate(test_images,  test_labels, verbose=2)
+print(test_acc)
+
+#繪製結果範例如下
+```
+![Alt text](readme-images/img2.png?raw=true "Title")
+
+###### (2)VGG-16介紹
+下列為VGG-16套用於Tensorflow下的組成程式碼：
+```
+model = models.Sequential()
+
+model.add(layers.Conv2D(64, (3, 3), activation='relu', 
+input_shape=(32, 32, 3), padding="same"))
+model.add(layers.Conv2D(64, (3, 3), activation='relu', padding="same"))
+model.add(layers.MaxPooling2D((2, 2), strides=(2,2)))
+
+model.add(layers.Conv2D(128, (3, 3), activation='relu', padding="same"))
+model.add(layers.Conv2D(128, (3, 3), activation="relu", padding="same"))
+model.add(layers.MaxPooling2D((2, 2), strides=(2,2)))
+
+model.add(layers.Conv2D(256, (3, 3), activation='relu', padding="same"))
+model.add(layers.Conv2D(256, (3, 3), activation='relu', padding="same"))
+model.add(layers.Conv2D(256, (3, 3), activation='relu', padding="same"))
+model.add(layers.MaxPooling2D((2, 2), strides=(2,2)))
+
+model.add(layers.Conv2D(512, (3, 3), activation="relu", padding="same"))
+model.add(layers.Conv2D(512, (3, 3), activation="relu", padding="same"))
+model.add(layers.Conv2D(512, (3, 3), activation="relu", padding="same"))
+model.add(layers.MaxPooling2D((2, 2), strides=(2,2)))
+
+model.add(layers.Conv2D(512, (3, 3), activation="relu", padding="same"))
+model.add(layers.Conv2D(512, (3, 3), activation="relu", padding="same"))
+model.add(layers.Conv2D(512, (3, 3), activation="relu", padding="same"))
+model.add(layers.MaxPooling2D((2, 2), strides=(2,2)))
+```
+來源：https://ithelp.ithome.com.tw/articles/10192162
+
+圖：VGG-16示意圖\
+![Alt text](readme-images/img3.jpg?raw=true "Title")\
+訓練結果：
+**loss: 2.3028 - acc: 0.0983 - val_loss: 2.3027 - val_acc: 0.1000**\
+將Epoch設定為6之後，所得結果卻不如預期，訓練準確度一直在0.0973與0.0991之間遊走，至於測試準確度則是很固定維持在0.1。在一般的電腦上去做訓練的時間也相當長，平均每訓練完一次就要占用30分鐘的時間。\
+
+為了了解這個現象，我們將VGG-16的層數減少，並且再跑一次。更改的項目以及結果如下：
+```py
+model = models.Sequential()
+
+model.add(layers.Conv2D(64, (3, 3), activation='relu', input_shape=(32, 32, 3), padding="same"))
+model.add(layers.Conv2D(64, (3, 3), activation='relu', padding="same"))
+model.add(layers.MaxPooling2D((2, 2), strides=(2,2)))
+
+model.add(layers.Conv2D(128, (3, 3), activation='relu', padding="same"))
+model.add(layers.Conv2D(128, (3, 3), activation="relu", padding="same"))
+model.add(layers.MaxPooling2D((2, 2), strides=(2,2)))
+
+model.add(layers.Conv2D(256, (3, 3), activation='relu', padding="same"))
+model.add(layers.Conv2D(256, (3, 3), activation='relu', padding="same"))
+model.add(layers.Conv2D(256, (3, 3), activation='relu', padding="same"))
+model.add(layers.MaxPooling2D((2, 2), strides=(2,2)))
+# 減少六個Conv2D層、兩個MaxPooling層、共八層
+model.add(layers.Flatten())
+model.add(layers.Dense(4096, activation='relu'))
+#減少一個Dense層
+model.add(layers.Dense(10, activation='softmax'))
+```
+訓練結果：
+**loss: 0.6019 - acc: 0.7874 - val_loss: 0.7636 - val_acc: 0.7388**\
+不難發現，訓練結果比起把所有的VGG-16都套用進CIFAR-10資料庫內好很多，甚至比原本官網所提供將近70%的準確度高出些許；至於訓練的速度，也是由層數較少的版本勝出。至於為何層數較少的版本反而執行起來的準確度高出許多?經過我們組內討論，這原因可以從Stanford的CNN教材中獲得解答。在第九章中的第81張投影片提到，若是增加太多層神經網路，在資料量不是特別高的訓練庫中的情形下，反而會增加錯誤率。CIFAR-10中的每一張圖皆是32x32的pixel數，但是VGG-16當初設計卻是輸入224x224的影像圖，我們認為訊息量上的落差會導致CIFAR-10的資料被過度解析，過多的層數也導致神經網路無法好好訓練。值得一提的是，此情況並非overfiiting，因為準確度並沒有因為訓練次數過多而降低--它本來就一直處於極低的情況。
+圖：Stanford的CNN教材
+![Alt text](readme-images/img4.jpg?raw=true "Title")
+
