@@ -21,9 +21,9 @@ Keras是一個開放原始碼，高階的深度學習程式庫，使用Python編
 
 透過Keras所提供的各項模組工具，例如卷積和池化模組，我們得以較輕鬆地操作一個類似上圖結構的神經網路，並透過調整各個細節的改變去研究每個環節對訓練與預測會造成那些影響。
 
-## Tensorflow與VGG-16範例 介紹
+## 二、Tensorflow與VGG-16範例 介紹
 
-###### (1)Tensorflow 語法介紹
+### (1)Tensorflow 語法介紹
 以下是我們報告之中所運行的基本程式碼：
 ```py
 #第一步先導入Tensorflow、Keras和Matplotlib
@@ -75,7 +75,7 @@ print(test_acc)
 ```
 ![Alt text](readme-images/img2.png?raw=true "Title")
 
-###### (2)VGG-16介紹
+### (2)VGG-16介紹
 下列為VGG-16套用於Tensorflow下的組成程式碼：
 ```
 model = models.Sequential()
@@ -140,3 +140,157 @@ model.add(layers.Dense(10, activation='softmax'))
 圖：Stanford的CNN教材
 ![Alt text](readme-images/img4.jpg?raw=true "Title")
 
+## 三、變數修改與結果
+### (1)調整Epoch的數量
+我們透過調整epoch的數量來觀察模型準確率的變化，以epoch數量5,10,15,20,25,30來做測試，每個數量均以程式各跑5次來求出平均：\
+epoch = 5, accuracy = 0.6901\
+epoch = 10, accuracy = 0.7143\
+epoch = 15, accuracy = 0.7023\
+epoch = 20, accuracy = 0.7001\
+epoch = 25, accuracy = 0.6988\
+epoch = 30, accuracy = 0.6885\
+可以看出在數量達到15以上之後，準確率反而下滑。
+後來我們針對epoch = 10做進一步測試，列出5,8,9,10,11,12,15個的測試。
+平均值為：\
+epoch = 5, accuracy = 0.6911\
+epoch = 8, accuracy = 0.6975\
+epoch = 9, accuracy = 0.6997\
+epoch = 10, accuracy = 0.7115\
+epoch = 11, accuracy = 0.7056\
+epoch = 12, accuracy = 0.7090\
+epoch = 15, accuracy = 0.7043\
+依然是epoch = 10為最高點，因此我們覺得，epoch數量若大於10個，在此模型就會產生over fitting的現象，進而導致準確率下降。
+
+### (2)Learning Rate
+透過更改步距來觀察準確率的變化，為了更改步距，必須import optimizers：
+```py
+from keras import optimizers
+# compile model時設定adam的learning rate, 我們分別測試了0.1, 0.01, 0.001, 0.0001四種
+adam = optimizers.Adam(lr=learning rate, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+model.compile(optimizer='adam',
+             loss='sparse_categorical_crossentropy',
+             metrics=['accuracy'])
+```
+以下是測試結果：\
+Lr = 0.1, Test Accuracy = 0.6871\
+Lr = 0.01, Test Accuracy = 0.7164\
+Lr = 0.001, Test Accuracy = 0.7060\
+Lr = 0.0001, Test Accuracy = 0.6774\
+從測試結果來看，對於這個模型來說，Learning rate = 0.01所得出的準確率是最高的，因此設為將步距設為0.01最為合適我們的data。
+
+### (3)Data Preprocessing
+完整程式碼：```Data Preprocessing.ipynb```\
+將資料先經過預先處理，標準化資料之後，能夠優化我們的模型；
+載入資料庫的圖片後，對圖片做標準化當作preprocessing：
+```py
+(train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
+def standardize(input):
+    mean = np.mean(input)
+    std = np.std(input)
+    return (input - mean) / std
+train_images, test_images = standardize(train_images)  , standardize(test_images)
+```
+以下是測試結果：\
+**loss: 0.7044 - acc: 0.7550 - val_loss: 0.8190 - val_acc: 0.7184**\
+Test Accuracy = 0.7184\
+相較之下，進行過data preprocessing的模型預測準確率，提高了大約4~5個百分點，效果相當顯著。
+
+### (4)Weight Initialization
+深度學習模型訓練的過程本身就是在調整weight的大小，但如何選擇參數初始值就是一個重要的環節，因為對於結構龐大的學習模型，非線性函數不斷疊加，因此選擇良好的初始值可大大增加模型的效率。\
+我們選擇了兩種initial function來介紹：
+#### i. Random initialization
+在convolutional, dense layer做初始化：
+```py
+model = models.Sequential()
+model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(32, 32, 3), 
+                       kernel_initializer=initializers.RandomNormal(mean=0.0, stddev=0.05, seed=None)))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(64, (3, 3), activation='relu', 
+                       kernel_initializer=initializers.RandomNormal(mean=0.0, stddev=0.05, seed=None)))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(64, (3, 3), activation='relu', 
+                       kernel_initializer=initializers.RandomNormal(mean=0.0, stddev=0.05, seed=None)))
+model.add(layers.Flatten())
+model.add(layers.Dense(64, activation='relu', 
+                      kernel_initializer=initializers.RandomNormal(mean=0.0, stddev=0.05, seed=None)))
+model.add(layers.Dense(10, activation='softmax', 
+                      kernel_initializer=initializers.RandomNormal(mean=0.0, stddev=0.05, seed=None)))
+```
+測試結果：\
+**loss: 0.8697 - acc: 0.6945 - val_loss: 0.9320 - val_acc: 0.6710**\
+Test Accuracy = 0.6710
+#### ii. Truncated initialization
+在convolutional, dense layer做初始化：
+```py
+model = models.Sequential()
+model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(32, 32, 3), 
+                       kernel_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.05, seed=None)))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(64, (3, 3), activation='relu', 
+                       kernel_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.05, seed=None)))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(64, (3, 3), activation='relu', 
+                       kernel_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.05, seed=None)))
+model.add(layers.Flatten())
+model.add(layers.Dense(64, activation='relu', 
+                      kernel_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.05, seed=None)))
+model.add(layers.Dense(10, activation='softmax', 
+                      kernel_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.05, seed=None)))
+```
+測試結果：\
+**loss: 0.8825 - acc: 0.6868 - val_loss: 0.9490 - val_acc: 0.6715**\
+Test Accuracy = 0.6715\
+由測試結果得知，這兩個weight initialization的效果對於我們的模型準確度皆沒有顯著的影響。
+
+### (5)Batch Normalization
+是將分散的數據統一標準化的一種做法，同樣的能夠優化我們的神經網路。將batch function加在maxpooling, dense layer之後：
+```py
+model = models.Sequential()
+model.add(layers.Conv2D(32, (3, 3), activation='sigmoid', input_shape=(32, 32, 3)))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.BatchNormalization())
+model.add(layers.Conv2D(64, (3, 3), activation='sigmoid'))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.BatchNormalization())
+model.add(layers.Conv2D(64, (3, 3), activation='sigmoid'))
+model.add(layers.Flatten())
+model.add(layers.Dense(64, activation='sigmoid'))
+model.add(layers.BatchNormalization())
+model.add(layers.Dense(10, activation='softmax'))
+```
+測試結果：
+**loss: 0.7193 - acc: 0.7504 - val_loss: 0.9392 - val_acc: 0.6816**\
+Test Accuracy = 0.6816\
+由測試結果可看出，batch normalization的效果對於我們的模型並沒有顯著的影響。
+
+### (6)Optimizer的調整
+Optimizer對於一個學習模型來說相當重要，隨著技術演化，新開發出的Optimizer可以得到更高的準確度以及更快的速度。
+#### i.使用Adadelta
+```py
+model.compile(optimizer='Adadelta', # 預設為lr=1.0, rho=0.95, epsilon=1e-06
+             loss='sparse_categorical_crossentropy',
+             metrics=['accuracy'])
+```
+Test Accuracy = 0.7339
+#### ii.使用Adagrad
+```py
+model.compile(optimizer='Adagrad', # 預設為lr=0.01, epsilon=1e-06
+             loss='sparse_categorical_crossentropy',
+             metrics=['accuracy'])
+```
+Test Accuracy = 0.7436
+#### iii.使用RMSprop
+```py
+model.compile(optimizer='RMSprop', # 預設為lr=0.001, rho=0.9, epsilon=1e-06
+             loss='sparse_categorical_crossentropy',
+             metrics=['accuracy'])
+```
+Test Accuracy = 0.6951
+#### iiii.使用sgd
+```py
+model.compile(optimizer='sgd', # 預設為lr=0.01, momentum=0.0, decay=0.0, nesterov=False
+             loss='sparse_categorical_crossentropy',
+             metrics=['accuracy'])
+```
+Test Accuracy = 0.5637\
+再加上我們原本使用的adam，我們共測試了五種的optimizer，可看出對於我們的資料，模型準確率最高的依序是Adagrad、Adadelta、RMSprop、adam、sgd，但這並不代表所有資料都適用於這個結論。
