@@ -106,7 +106,7 @@ model.add(layers.MaxPooling2D((2, 2), strides=(2,2)))
 ```
 來源：https://ithelp.ithome.com.tw/articles/10192162
 
-圖：VGG-16示意圖\
+圖：VGG-16示意圖
 ![Alt text](readme-images/img3.jpg?raw=true "Title")\
 訓練結果：
 **loss: 2.3028 - acc: 0.0983 - val_loss: 2.3027 - val_acc: 0.1000**\
@@ -294,3 +294,118 @@ model.compile(optimizer='sgd', # 預設為lr=0.01, momentum=0.0, decay=0.0, nest
 ```
 Test Accuracy = 0.5637\
 再加上我們原本使用的adam，我們共測試了五種的optimizer，可看出對於我們的資料，模型準確率最高的依序是Adagrad、Adadelta、RMSprop、adam、sgd，但這並不代表所有資料都適用於這個結論。
+
+### (7)Dropout
+當學習模型容量過高或者是訓練資料過少很容易造成over fitting的問題，這時候利用dropout以一定的機率丟棄隱藏層神經元，這樣在反向傳播時，被丟棄的神經元梯度是 0，所以在訓練時不會過度依賴某一些神經元，藉此達到預防over fitting的效果。
+#### i.將dropout機率設為0.2
+```py
+model = models.Sequential()
+model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(32, 32, 3)))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+model.add(layers.Flatten())
+model.add(layers.Dense(64, activation='relu'))
+model.add(layers.Dropout(0.2))
+model.add(layers.Dense(10, activation='softmax'))
+```
+Test Accuracy = 0.6832
+#### ii.將dropout機率設為0.3
+```py
+model = models.Sequential()
+model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(32, 32, 3)))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+model.add(layers.Flatten())
+model.add(layers.Dense(64, activation='relu'))
+model.add(layers.Dropout(0.3))
+model.add(layers.Dense(10, activation='softmax'))
+```
+Test Accuracy = 0.6586
+#### iii.將dropout機率設為0.4
+```py
+model = models.Sequential()
+model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(32, 32, 3)))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+model.add(layers.Flatten())
+model.add(layers.Dense(64, activation='relu'))
+model.add(layers.Dropout(0.4))
+model.add(layers.Dense(10, activation='softmax'))
+```
+Test Accuracy = 0.6476
+#### iiii.將dropout機率設為0.5
+```py
+model = models.Sequential()
+model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(32, 32, 3)))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+model.add(layers.Flatten())
+model.add(layers.Dense(64, activation='relu'))
+model.add(layers.Dropout(0.5))
+model.add(layers.Dense(10, activation='softmax'))
+```
+Test Accuracy = 0.6554\
+從結果看出，除了dropout=0.22得到的準確率略高一點以外，其餘的皆差不到一個百分點，因此將dropout機率設為0.2應是最適合我們的資料。
+
+### (8) 最佳模型
+我們將個別參數最好的結果放在一起，發現準確率反而下降，大約在0.52左右，可見參數的設定必須視情況而定，並沒有標準答案。
+因此，我們根據VGG16為樣本進行修改，將層數縮小，原先的VGG16有五個block，但因我們輸入之圖片大小為32x32，因此，我們刪掉至三個block。而其他參數保持不變，像是filter為3x3、兩層卷積一層池化、權重初始化用he_normal、relu等。\
+此外，我們還採用data preprocessing、data augmentation、dropout等技術，以增加資料量並減少overfitting的問題。
+完整程式碼在```OwnImageTest.ipynb```中；Test Accuracy = 0.7898
+
+## 四、自行測試圖片
+訓練完成之後，可以用自身的圖片來測試結果。
+首先，在整個model皆完成訓練後，新增一個save來把用CIFAR-10訓練完成的model存起來：
+```py
+model.save('model.h5')
+```
+系統會將它儲存在和執行的.py檔同一個資料夾，若有重新訓練過，系統會將它覆寫。
+下一步，則是將之前儲存的model 提出來：
+```py
+from keras.models import load_model
+loaded_model = tf.keras.models.load_model('model.h5')
+loaded_model.layers[0].input_shape
+loaded_model.evaluate(test_images, test_labels)
+```
+最後，我們寫了兩個函式，分別是input和process。input為一簡單函式，將要輸入的圖片在電腦內的路徑用array的形式去儲存，再將它一一提出並且讀取、判斷。process則需要使用到OpenCV來讀取圖片並且轉為32x32x3的形式，藉由predict來把之前存取的模型套在圖片上。最後，顯示分數最高的class名稱。\
+完整程式碼在```OwnImageTest.ipynb```中
+```py
+import cv2 as cv
+def input(pictureArray):
+    for i in range(0, len(pictureArray)):
+        process(pictureArray[i])
+
+def process (img):
+    image = cv.imread(img, cv.IMREAD_COLOR)
+    image = cv.resize(image, (32, 32))
+    image = image.astype('float32')
+    image = image.reshape(1, 32, 32, 3)
+    image = 255-image
+    image /= 255
+    plt.show()
+    pred = loaded_model.predict(image.reshape(1, 32, 32, 3), batch_size=1)
+    print('Prediction:' + class_names [pred.argmax()])
+    img = load_img(img, target_size=(32, 32))
+    plt.figure()
+    plt.imshow(img) 
+    plt.show()
+
+pictureArray = ['C:/Users/user/Test Images/ship1.jpg', 
+                'C:/Users/user/Test Images/ship2.jpg', 
+		.
+		.
+		.
+	#輸入多組圖片的當案路徑
+					]
+input(pictureArray)
+```
+我們將八張船以及六張貓的照片放進照片，結果訓練效果不符合在CIFAR-10上的訓練準確度。我們認為原因來自於我們的訓練集CIFAR-10是32x32的圖，導致我們自己放進去的圖也要符合32x32的格式，在pixel數不夠高的情形下難以去辨識其好壞，因此錯誤率才會如此高。在未來，除了可以嘗試訓練影像資訊量更大的資料集外，也要再多嘗試不同的訓練參數，以獲得更好的訓練成績。
+
